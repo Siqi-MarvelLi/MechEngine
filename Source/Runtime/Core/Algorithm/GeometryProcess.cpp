@@ -21,7 +21,7 @@
 #include <unsupported/Eigen/NumericalDiff>
 #include <CGAL/Polygon_mesh_processing/self_intersections.h>
 
-#include "Clipper2/clipper.h"
+#include "clipper2/clipper.h"
 
 namespace MechEngine::Algorithm::GeometryProcess
 {

@@ -62,8 +62,10 @@ set(CLIPPER2_LIBS "") # one or both of Clipper2/Clipper2Z
 if (NOT (CLIPPER2_USINGZ STREQUAL "ONLY"))
   list(APPEND CLIPPER2_LIBS Clipper2)
   add_library(Clipper2 ${CLIPPER2_INC} ${CLIPPER2_SRC})
-#  target_include_directories(Clipper2 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/Clipper2Lib/include)
-
+  target_include_directories(Clipper2 PUBLIC
+          $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Clipper2Lib/include>
+          $<INSTALL_INTERFACE:include>  # Only if you are actually installing headers
+  )
   target_compile_definitions(
     Clipper2 PUBLIC
       CLIPPER2_MAX_DECIMAL_PRECISION=${CLIPPER2_MAX_DECIMAL_PRECISION}

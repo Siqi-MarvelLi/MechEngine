@@ -30,7 +30,7 @@ public:
 		return World == nullptr ? nullptr :  World->GetScene();
 	}
 
-	FORCEINLINE virtual void PostEdit(Reflection::FieldAccessor& Field) override;
+	virtual void PostEdit(Reflection::FieldAccessor& Field) override;
 
 	FORCEINLINE virtual void TickComponent(double DeltaTime) override;
 
