@@ -186,9 +186,11 @@ typedef std::tuple<GetFuncion> PointerFunctionTuple;
 
 namespace Reflection
 {
+	class TypeMeta;
 	class EnumAccessor;
 	class ArrayAccessor;
 	class PointerAccessor;
+	class FieldAccessor;
 
     class ENGINE_API TypeMetaRegisterinterface
     {
@@ -206,52 +208,6 @@ namespace Reflection
     	static void registerToPointerMap(const char* name, PointerFunctionTuple* value);
 
         static void unregisterAll();
-    };
-
-    class ENGINE_API TypeMeta
-    {
-        friend class FieldAccessor;
-        friend class ArrayAccessor;
-        friend class TypeMetaRegisterinterface;
-
-    public:
-        TypeMeta();
-
-        // static void Register();
-
-        static TypeMeta newMetaFromName(std::string type_name);
-
-        static bool newArrayAccessorFromName(std::string array_type_name, ArrayAccessor& accessor);
-
-        static ReflectionInstance newFromNameAndJson(std::string type_name, const Json& json_context);
-
-        static Json writeByName(std::string type_name, void* instance);
-
-        std::string getTypeName();
-
-        std::vector<FieldAccessor> getFieldsList();
-
-        std::vector<MethodAccessor> getMethodsList();
-
-        int getBaseClassReflectionInstanceList(ReflectionInstance*& out_list, void* instance);
-
-        FieldAccessor getFieldByName(const std::string& name);
-
-        MethodAccessor getMethodByName(const std::string& name);
-
-        bool isValid() { return m_is_valid; }
-
-        TypeMeta& operator=(const TypeMeta& dest);
-
-    private:
-        TypeMeta(std::string type_name);
-
-    private:
-        std::vector<FieldAccessor, std::allocator<FieldAccessor>> m_fields;
-        std::vector<MethodAccessor, std::allocator<MethodAccessor>> m_methods;
-        std::string m_type_name;
-
-        bool m_is_valid;
     };
 
     class ENGINE_API FieldAccessor
@@ -470,6 +426,52 @@ namespace Reflection
 		PointerFunctionTuple* m_func;
 		void* m_filed_ptr;
 		void* m_instance;
+	};
+
+	class ENGINE_API TypeMeta
+	{
+		friend class FieldAccessor;
+		friend class ArrayAccessor;
+		friend class TypeMetaRegisterinterface;
+
+	public:
+		TypeMeta();
+
+		// static void Register();
+
+		static TypeMeta newMetaFromName(std::string type_name);
+
+		static bool newArrayAccessorFromName(std::string array_type_name, ArrayAccessor& accessor);
+
+		static ReflectionInstance newFromNameAndJson(std::string type_name, const Json& json_context);
+
+		static Json writeByName(std::string type_name, void* instance);
+
+		std::string getTypeName();
+
+		std::vector<FieldAccessor> getFieldsList();
+
+		std::vector<MethodAccessor> getMethodsList();
+
+		int getBaseClassReflectionInstanceList(ReflectionInstance*& out_list, void* instance);
+
+		FieldAccessor getFieldByName(const std::string& name);
+
+		MethodAccessor getMethodByName(const std::string& name);
+
+		bool isValid() { return m_is_valid; }
+
+		TypeMeta& operator=(const TypeMeta& dest);
+
+	private:
+		TypeMeta(std::string type_name);
+
+	private:
+		std::vector<FieldAccessor, std::allocator<FieldAccessor>> m_fields;
+		std::vector<MethodAccessor, std::allocator<MethodAccessor>> m_methods;
+		std::string m_type_name;
+
+		bool m_is_valid;
 	};
 
     class ENGINE_API ReflectionInstance
