@@ -61,7 +61,7 @@ set(CLIPPER2_LIBS "") # one or both of Clipper2/Clipper2Z
 # primary Clipper2 library
 if (NOT (CLIPPER2_USINGZ STREQUAL "ONLY"))
   list(APPEND CLIPPER2_LIBS Clipper2)
-  add_library(Clipper2 ${CLIPPER2_INC} ${CLIPPER2_SRC})
+  add_library(Clipper2 SHARED ${CLIPPER2_SRC})
   target_include_directories(Clipper2 PUBLIC
           $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Clipper2Lib/include>
           $<INSTALL_INTERFACE:include>  # Only if you are actually installing headers
@@ -80,6 +80,7 @@ if (NOT (CLIPPER2_USINGZ STREQUAL "ONLY"))
 
   if (MSVC)
     target_compile_options(Clipper2 PRIVATE /W4 /WX)
+    set_target_properties(Clipper2 PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
   else()
     target_compile_options(Clipper2 PRIVATE -Wall -Wextra -Wpedantic -Werror)
     target_link_libraries(Clipper2 PUBLIC -lm)
