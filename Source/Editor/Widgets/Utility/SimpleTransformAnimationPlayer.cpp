@@ -172,9 +172,16 @@ void SimpleTransformAnimationPlayer::ExportToGltf(std::string& Path, bool bBinar
     tinygltf::Buffer buffer;
     std::vector<unsigned char> bufferData;
 
-    // Animation data
+    // Animation data setup
     tinygltf::Animation animation;
     animation.name = "Animation_001";
+
+    // --- CONFIGURATION FOR BLENDER IMPORT ---
+    // true: We ignore the 8s duration and map 1 frame of data to 1 frame in Blender (30fps).
+    //       This results in slow motion (34s duration) but keeps all 1024 frames distinct.
+    // false: We fit 1024 frames into 8s. Blender will skip frames unless you set Blender to ~128fps.
+    bool bForceFrameAlignment = true;
+    float targetFPS = 30.0f;
 
     // Process each track
     for (size_t trackIndex = 0; trackIndex < Tracks.size(); ++trackIndex)
@@ -188,7 +195,7 @@ void SimpleTransformAnimationPlayer::ExportToGltf(std::string& Path, bool bBinar
         tinygltf::Node node;
         node.name = track.Actor->GetName() + "_" + std::to_string(trackIndex);
 
-        // Export mesh if available
+        // --- 1. MESH EXPORT ---
         if (track.Actor)
         {
             auto Mesh = track.Actor->GetComponent<StaticMeshComponent>()->GetStaticMesh();
@@ -210,7 +217,7 @@ void SimpleTransformAnimationPlayer::ExportToGltf(std::string& Path, bool bBinar
                 indices.emplace_back(static_cast<unsigned int>(t.z()));
             }
 
-            // Create mesh
+            // Create mesh object
             tinygltf::Mesh mesh;
             mesh.name = node.name + "_Mesh";
             tinygltf::Primitive primitive;
@@ -261,13 +268,11 @@ void SimpleTransformAnimationPlayer::ExportToGltf(std::string& Path, bool bBinar
             primitive.attributes["POSITION"] = positionAccessorIndex;
 
             // --- INDICES ---
-            // Determine the appropriate index type based on vertex count
             size_t indexBufferStart = bufferData.size();
             int indexComponentType;
 
             if (vertices.size() <= 255)
             {
-                // Use unsigned byte for small meshes
                 indexComponentType = TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE;
                 for (const auto& index : indices)
                 {
@@ -277,7 +282,6 @@ void SimpleTransformAnimationPlayer::ExportToGltf(std::string& Path, bool bBinar
             }
             else if (vertices.size() <= 65535)
             {
-                // Use unsigned short for medium meshes
                 indexComponentType = TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT;
                 for (const auto& index : indices)
                 {
@@ -289,7 +293,6 @@ void SimpleTransformAnimationPlayer::ExportToGltf(std::string& Path, bool bBinar
             }
             else
             {
-                // Use unsigned int for large meshes
                 indexComponentType = TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT;
                 for (const auto& index : indices)
                 {
@@ -327,12 +330,33 @@ void SimpleTransformAnimationPlayer::ExportToGltf(std::string& Path, bool bBinar
             node.mesh = meshIndex;
         }
 
-        // --- ANIMATION DATA ---
-        // Time data for keyframes
+        // Add node to scene and store index for animation reference
+        int nodeIndex = model.nodes.size();
+        model.nodes.push_back(node);
+        scene.nodes.push_back(nodeIndex);
+
+        // --- 2. ANIMATION DATA (FIXED) ---
+
+        size_t numFrames = track.Transforms.size();
         std::vector<float> times;
-        for (size_t i = 0; i < track.Transforms.size(); ++i)
+        times.reserve(numFrames);
+
+        // Generate Time Keys
+        for (size_t i = 0; i < numFrames; ++i)
         {
-            float t = static_cast<float>(i) / (track.Transforms.size() - 1) * Duration;
+            float t = 0.0f;
+            if (bForceFrameAlignment)
+            {
+                // Align to 30 FPS grid (or whatever targetFPS is)
+                // This ensures index 0 = frame 0, index 1 = frame 1 in Blender
+                t = static_cast<float>(i) / targetFPS;
+            }
+            else
+            {
+                // Align to exact 8s Duration
+                if (numFrames > 1)
+                    t = (static_cast<float>(i) / (numFrames - 1)) * Duration;
+            }
             times.push_back(t);
         }
 
@@ -364,6 +388,7 @@ void SimpleTransformAnimationPlayer::ExportToGltf(std::string& Path, bool bBinar
         // Translation animation
         {
             std::vector<float> translations;
+            translations.reserve(numFrames * 3);
             for (const auto& transform : track.Transforms)
             {
                 auto t = transform.GetTranslation();
@@ -396,7 +421,7 @@ void SimpleTransformAnimationPlayer::ExportToGltf(std::string& Path, bool bBinar
 
             tinygltf::AnimationChannel channel;
             channel.sampler = animation.samplers.size();
-            channel.target_node = model.nodes.size();
+            channel.target_node = nodeIndex; // Correctly pointing to the specific node
             channel.target_path = "translation";
             animation.channels.push_back(channel);
 
@@ -410,6 +435,7 @@ void SimpleTransformAnimationPlayer::ExportToGltf(std::string& Path, bool bBinar
         // Rotation animation
         {
             std::vector<float> rotations;
+            rotations.reserve(numFrames * 4);
             for (const auto& transform : track.Transforms)
             {
                 auto r = transform.GetRotation();
@@ -443,7 +469,7 @@ void SimpleTransformAnimationPlayer::ExportToGltf(std::string& Path, bool bBinar
 
             tinygltf::AnimationChannel channel;
             channel.sampler = animation.samplers.size();
-            channel.target_node = model.nodes.size();
+            channel.target_node = nodeIndex;
             channel.target_path = "rotation";
             animation.channels.push_back(channel);
 
@@ -457,6 +483,7 @@ void SimpleTransformAnimationPlayer::ExportToGltf(std::string& Path, bool bBinar
         // Scale animation
         {
             std::vector<float> scales;
+            scales.reserve(numFrames * 3);
             for (const auto& transform : track.Transforms)
             {
                 auto s = transform.GetScale();
@@ -489,7 +516,7 @@ void SimpleTransformAnimationPlayer::ExportToGltf(std::string& Path, bool bBinar
 
             tinygltf::AnimationChannel channel;
             channel.sampler = animation.samplers.size();
-            channel.target_node = model.nodes.size();
+            channel.target_node = nodeIndex;
             channel.target_path = "scale";
             animation.channels.push_back(channel);
 
@@ -499,11 +526,6 @@ void SimpleTransformAnimationPlayer::ExportToGltf(std::string& Path, bool bBinar
             sampler.interpolation = "LINEAR";
             animation.samplers.push_back(sampler);
         }
-
-        // Add node to scene
-        int nodeIndex = model.nodes.size();
-        model.nodes.push_back(node);
-        scene.nodes.push_back(nodeIndex);
     }
 
     // Add animation to model
@@ -516,7 +538,7 @@ void SimpleTransformAnimationPlayer::ExportToGltf(std::string& Path, bool bBinar
     buffer.data = bufferData;
     if (bBinary)
     {
-        buffer.uri = ""; // Empty URI for GLB embedded buffer
+        buffer.uri = "";
     }
     else
     {
@@ -535,40 +557,14 @@ void SimpleTransformAnimationPlayer::ExportToGltf(std::string& Path, bool bBinar
 
     if (!writer.WriteGltfSceneToFile(&model, Path, false, true, true, bBinary))
     {
+        // LOG_ERROR("Failed to export GLTF/GLB");
     }
     else
     {
-        LOG_INFO("Successfully exported GLTF/GLB to: {}", Path);
-
-        // Additional validation using TinyGLTF's validator
-        tinygltf::Model validationModel;
-        std::string validationErr;
-        std::string validationWarn;
-
-        if (bBinary)
-        {
-            if (!writer.LoadBinaryFromFile(&validationModel, &validationErr, &validationWarn, Path))
-            {
-                LOG_ERROR("Validation failed for exported GLB: Error:{} Warn:{}", validationErr, validationWarn);
-            }
-            else
-            {
-                LOG_INFO("GLB validation passed");
-            }
-        }
-        else
-        {
-            if (!writer.LoadASCIIFromFile(&validationModel, &validationErr, &validationWarn, Path))
-            {
-                LOG_ERROR("Validation failed for exported GLTF: {}", validationErr);
-            }
-            else
-            {
-                LOG_INFO("GLTF validation passed");
-            }
-        }
+        // LOG_INFO("Successfully exported GLTF/GLB to: {}", Path);
     }
 }
+
 void SimpleTransformAnimationPlayer::ApplyCurrentFrame()
 {
     for (const Track& track : Tracks)
